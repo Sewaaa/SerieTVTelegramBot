@@ -1,8 +1,14 @@
+import os
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# ID del canale privato
-CHANNEL_ID = "CHANNEL_ID"  # Sostituisci con il tuo ID del canale
+# Carica le variabili d'ambiente dal file .env (solo in locale)
+load_dotenv()
+
+# Leggi le variabili d'ambiente
+TOKEN = os.getenv("TOKEN")  # Token del bot
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # ID del canale privato (deve essere in formato stringa)
 
 # Database per le serie TV (in memoria per ora)
 database = {}
@@ -39,15 +45,16 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Configurazione del bot
 def main():
-    import os
-    TOKEN = os.getenv("TOKEN")  # Prendi il token dalla variabile d'ambiente
+    # Controllo che TOKEN e CHANNEL_ID siano presenti
+    if not TOKEN or not CHANNEL_ID:
+        raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
     # Crea l'applicazione
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.Video & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
+    application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
     # Avvia il bot
     application.run_polling()
