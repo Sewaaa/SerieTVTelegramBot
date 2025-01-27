@@ -84,7 +84,7 @@ def torna_indietro(update: Update, context: CallbackContext):
 
 # Configurazione del bot
 def main():
-    updater = Updater("TOKEN_DEL_TUO_BOT", use_context=True)
+    updater = Updater("7961156888:AAGjPyKiF9XtIJkw45xYPQ_B7z6ET4z2Xac", use_context=True)
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
