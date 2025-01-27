@@ -16,12 +16,67 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Non ci sono serie TV disponibili al momento.")
         return
 
+    # Mostra la lista delle serie TV
     buttons = [
         [InlineKeyboardButton(serie["nome"], callback_data=serie_id)]
         for serie_id, serie in database.items()
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
     await update.message.reply_text("Scegli una serie TV:", reply_markup=reply_markup)
+
+# Funzione per gestire il click sulla serie e mostrare le stagioni
+async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    serie_id = query.data  # Ottieni l'ID della serie dal callback data
+    serie = database.get(serie_id)
+
+    if serie:
+        # Mostra le stagioni disponibili per la serie selezionata
+        buttons = [
+            [InlineKeyboardButton(f"Stagione {stagione}", callback_data=f"{serie_id}|{stagione}")]
+            for stagione in sorted(serie["stagioni"].keys())  # Ordina le stagioni numericamente
+        ]
+        buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.edit_message_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
+
+# Funzione per mostrare gli episodi di una stagione
+async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Ottieni serie ID e numero stagione dal callback data
+    serie_id, stagione = query.data.split("|")
+    stagione = int(stagione)  # Converti in intero
+    serie = database.get(serie_id)
+
+    if serie and stagione in serie["stagioni"]:
+        # Mostra gli episodi della stagione selezionata
+        episodi = serie["stagioni"][stagione]
+        buttons = [
+            [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['file_id']}")]
+            for ep in episodi
+        ]
+        buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.edit_message_text(f"Episodi di {serie['nome']} - Stagione {stagione}:", reply_markup=reply_markup)
+
+# Funzione per inviare un episodio selezionato
+async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Ottieni il file_id dell'episodio selezionato
+    file_id = query.data.split("|")[1]
+    await query.message.reply_video(video=file_id)
+
+# Funzione per tornare alla lista delle serie
+async def torna_indietro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await start(update, context)
 
 # Funzione per aggiungere i video al database
 async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,6 +132,10 @@ def main():
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern="^(?!play|indietro).*"))
+    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=".*\|\d+"))
+    application.add_handler(CallbackQueryHandler(invia_episodio, pattern="^play\|"))
+    application.add_handler(CallbackQueryHandler(torna_indietro, pattern="^indietro$"))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
     # Avvia il bot
