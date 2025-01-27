@@ -1,29 +1,29 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+
+# Inserisci direttamente il token del bot
+TOKEN = "7961156888:AAGjPyKiF9XtIJkw45xYPQ_B7z6ET4z2Xac"
 
 # Funzione per il comando /start
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Ciao! Sono il tuo bot. Puoi accedere alle serie TV cliccando sui pulsanti!")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Ciao! Sono il tuo bot. Puoi accedere alle serie TV cliccando sui pulsanti!")
 
 # Funzione per rispondere a un messaggio
-def echo(update: Update, context: CallbackContext):
-    update.message.reply_text(f"Hai scritto: {update.message.text}")
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"Hai scritto: {update.message.text}")
 
 # Configurazione del bot
 def main():
-    import os
-    TOKEN = os.getenv("7961156888:AAGjPyKiF9XtIJkw45xYPQ_B7z6ET4z2Xac")  # Prende il token dalla variabile d'ambiente
-    updater = Updater(TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
+    # Creazione dell'applicazione
+    application = Application.builder().token(TOKEN).build()
 
     # Comandi e funzioni del bot
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", start))
-    dispatcher.add_handler(CallbackQueryHandler(echo))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", start))  # Alias di /start
+    application.add_handler(CallbackQueryHandler(echo))
 
     # Avvia il bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
