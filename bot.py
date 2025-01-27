@@ -1,9 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# Inserisci direttamente il token del bot
-TOKEN = "7961156888:AAGjPyKiF9XtIJkw45xYPQ_B7z6ET4z2Xac"
-
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Ciao! Sono il tuo bot. Puoi accedere alle serie TV cliccando sui pulsanti!")
@@ -14,6 +11,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Configurazione del bot
 def main():
+    import os
+    TOKEN = os.getenv("TOKEN")  # Prende il token dalla variabile d'ambiente
+
     # Creazione dell'applicazione
     application = Application.builder().token(TOKEN).build()
 
