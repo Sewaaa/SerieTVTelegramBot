@@ -32,6 +32,9 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     serie = database.get(serie_id)
 
     if serie:
+        # Log delle stagioni disponibili
+        print(f"Stagioni per {serie_id}: {sorted(serie['stagioni'].keys())}")
+
         buttons = [
             [InlineKeyboardButton(f"Stagione {stagione}", callback_data=f"{serie_id}|{stagione}")]
             for stagione in sorted(serie["stagioni"].keys())
@@ -45,10 +48,13 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # Log del callback data ricevuto
+    print(f"Callback data ricevuto: {query.data}")
+
     try:
         # Estrarre serie_id e stagione dal callback data
         serie_id, stagione = query.data.split("|")
-        stagione = int(stagione)
+        stagione = int(stagione)  # Converti in intero
         serie = database.get(serie_id)
 
         if serie and stagione in serie["stagioni"]:
