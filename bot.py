@@ -1,12 +1,8 @@
 import os
-from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# Carica le variabili d'ambiente dal file .env (solo in locale)
-load_dotenv()
-
-# Leggi le variabili d'ambiente
+# Leggi le variabili d'ambiente (Railway le gestisce automaticamente)
 TOKEN = os.getenv("TOKEN")  # Token del bot
 CHANNEL_ID = os.getenv("CHANNEL_ID")  # ID del canale privato (deve essere in formato stringa)
 
