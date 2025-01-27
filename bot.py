@@ -1,12 +1,13 @@
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+import re  # Per estrarre i dati dalla descrizione
 
-# Leggi le variabili d'ambiente (Railway le gestisce automaticamente)
-TOKEN = os.getenv("TOKEN")  # Token del bot
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # ID del canale privato (deve essere in formato stringa)
+# Leggi le variabili d'ambiente
+TOKEN = os.getenv("TOKEN")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-# Database per le serie TV (in memoria per ora)
+# Database per le serie TV
 database = {}
 
 # Funzione per il comando /start
@@ -26,18 +27,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.channel_post and update.channel_post.video:
         file_id = update.channel_post.video.file_id
-        titolo = update.channel_post.caption or "Senza titolo"
+        caption = update.channel_post.caption
 
-        # Aggiungi al database
-        if "Serie TV 1" not in database:
-            database["serie1"] = {
-                "nome": "Serie TV 1",
-                "stagioni": {
-                    "Stagione 1": []
-                }
+        # Estrai i dati dalla descrizione
+        match = re.search(
+            r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
+        )
+        if not match:
+            print("Formato della descrizione non valido.")
+            return
+
+        serie_nome, stagione, episodio = match.groups()
+
+        # Converti stagione ed episodio in numeri
+        stagione = int(stagione)
+        episodio = int(episodio)
+
+        # Costruisci il titolo in automatico (es. "S1EP1")
+        titolo = f"S{stagione}EP{episodio}"
+
+        # Aggiungi la serie al database se non esiste
+        serie_id = serie_nome.lower().replace(" ", "_")  # Usa un ID unico per ogni serie
+        if serie_id not in database:
+            database[serie_id] = {
+                "nome": serie_nome,
+                "stagioni": {}
             }
-        database["serie1"]["stagioni"]["Stagione 1"].append({"episodio": titolo, "file_id": file_id})
-        print(f"Aggiunto: {titolo}, File ID: {file_id}")
+
+        # Aggiungi la stagione se non esiste
+        if stagione not in database[serie_id]["stagioni"]:
+            database[serie_id]["stagioni"][stagione] = []
+
+        # Aggiungi l'episodio alla stagione
+        database[serie_id]["stagioni"][stagione].append({
+            "episodio": titolo,
+            "file_id": file_id
+        })
+
+        print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
 
 # Configurazione del bot
 def main():
