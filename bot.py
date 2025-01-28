@@ -188,12 +188,16 @@ async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("La struttura del database è stata stampata nei log.")
 
 # Configurazione del bot
+# Configurazione del bot
 def main():
     if not TOKEN or not CHANNEL_ID:
         raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
-    # Crea l'applicazione con JobQueue abilitato
-    application = Application.builder().token(TOKEN).post_init(lambda app: app.job_queue.start()).build()
+    # Crea l'applicazione e avvia il JobQueue
+    application = Application.builder().token(TOKEN).build()
+
+    # Avvia il JobQueue
+    application.job_queue = application.job_queue or application.create_job_queue()
 
     # Registra i comandi e i callback
     application.add_handler(CommandHandler("start", start))
@@ -212,3 +216,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
