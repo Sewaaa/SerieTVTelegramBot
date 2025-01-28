@@ -12,8 +12,16 @@ database = {}
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Controlla se l'update proviene da un messaggio o da un callback
+    if update.message:
+        message = update.message
+    elif update.callback_query:
+        message = update.callback_query.message
+    else:
+        return  # Nessun messaggio disponibile
+
     if not database:
-        await update.message.reply_text("Non ci sono serie TV disponibili al momento.")
+        await message.reply_text("Non ci sono serie TV disponibili al momento.")
         return
 
     # Mostra la lista delle serie TV
@@ -22,7 +30,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for serie_id, serie in database.items()
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
-    await update.message.reply_text("Scegli una serie TV:", reply_markup=reply_markup)
+    await message.reply_text("Scegli una serie TV:", reply_markup=reply_markup)
 
 # Funzione per gestire il click sulla serie e mostrare le stagioni
 async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -40,7 +48,7 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
         reply_markup = InlineKeyboardMarkup(buttons)
-        await query.edit_message_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
+        await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
 
 # Funzione per mostrare gli episodi di una stagione
 async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -61,7 +69,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
         reply_markup = InlineKeyboardMarkup(buttons)
-        await query.edit_message_text(f"Episodi di {serie['nome']} - Stagione {stagione}:", reply_markup=reply_markup)
+        await query.message.edit_text(f"Episodi di {serie['nome']} - Stagione {stagione}:", reply_markup=reply_markup)
 
 # Funzione per inviare un episodio selezionato
 async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
