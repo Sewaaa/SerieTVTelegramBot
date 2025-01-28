@@ -44,11 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return  # Nessun messaggio disponibile
 
     if not database:
-        # Se il database è vuoto
-        if "last_message" in context.user_data:
-            await context.user_data["last_message"].edit_text("Non ci sono serie TV disponibili al momento.")
-        else:
-            context.user_data["last_message"] = await message.reply_text("Non ci sono serie TV disponibili al momento.")
+        await message.reply_text("Non ci sono serie TV disponibili al momento.")
         return
 
     # Mostra la lista delle serie TV
@@ -57,14 +53,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for serie_id, serie in database.items()
     ]
     reply_markup = InlineKeyboardMarkup(buttons)
-
-    # Modifica o invia il messaggio
-    if "last_message" in context.user_data:
-        context.user_data["last_message"] = await context.user_data["last_message"].edit_text(
-            "Scegli una serie TV:", reply_markup=reply_markup
-        )
-    else:
-        context.user_data["last_message"] = await message.reply_text("Scegli una serie TV:", reply_markup=reply_markup)
+    await message.reply_text("Scegli una serie TV:", reply_markup=reply_markup)
 
 # Funzione per mostrare le stagioni
 async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -83,13 +72,9 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
 
         reply_markup = InlineKeyboardMarkup(buttons)
-
-        # Modifica il messaggio precedente
-        context.user_data["last_message"] = await query.message.edit_text(
-            f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup
-        )
+        await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
     else:
-        context.user_data["last_message"] = await query.message.edit_text("Errore: serie non trovata nel database.")
+        await query.message.edit_text("Errore: serie non trovata nel database.")
 
 # Funzione per mostrare gli episodi
 async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -100,7 +85,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         serie_id, stagione = query.data.split("|")
         stagione = int(stagione)
     except ValueError:
-        context.user_data["last_message"] = await query.message.edit_text("Errore: callback data non valido.")
+        await query.message.edit_text("Errore: callback data non valido.")
         return
 
     serie = database.get(serie_id)
@@ -115,14 +100,12 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
 
         reply_markup = InlineKeyboardMarkup(buttons)
-
-        # Modifica il messaggio precedente
-        context.user_data["last_message"] = await query.message.edit_text(
+        await query.message.edit_text(
             f"Episodi di {serie['nome']} - Stagione {stagione}:",
             reply_markup=reply_markup
         )
     else:
-        context.user_data["last_message"] = await query.message.edit_text(
+        await query.message.edit_text(
             f"Nessun episodio trovato per {serie['nome']} - Stagione {stagione}."
             if serie else "Errore: serie non trovata nel database."
         )
@@ -153,7 +136,6 @@ async def torna_alla_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await start(update, context)
-
 
 # Funzione per aggiungere i video al database
 async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
