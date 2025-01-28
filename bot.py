@@ -10,6 +10,15 @@ CHANNEL_ID = os.getenv("CHANNEL_ID")
 # Database per le serie TV
 database = {}
 
+async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
+    async for message in context.bot.get_chat_history(CHANNEL_ID, limit=1000):
+        if message.video and message.caption:
+            # Usa la funzione leggi_file_id per aggiungere i video al database
+            update = Update(update_id=0, channel_post=message)
+            await leggi_file_id(update, context)
+    print("DEBUG: Scansione del canale completata.")
+
+
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Controlla se l'update proviene da un messaggio o da un callback
@@ -193,7 +202,9 @@ def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-
+    # Scansione del canale per i vecchi video (eseguita una sola volta all'avvio)
+    application.job_queue.run_once(scansione_canale, when=0)
+    
     application.run_polling()
 
 if __name__ == "__main__":
