@@ -32,7 +32,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(buttons)
     await message.reply_text("Scegli una serie TV:", reply_markup=reply_markup)
 
-# Funzione per gestire il click sulla serie e mostrare le stagioni
 async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -40,17 +39,31 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     serie_id = query.data  # Ottieni l'ID della serie dal callback data
     serie = database.get(serie_id)
 
-    if serie:
-        # Mostra le stagioni disponibili per la serie selezionata
-        buttons = [
-            [InlineKeyboardButton(f"Stagione {stagione}", callback_data=f"{serie_id}|{stagione}")]
-            for stagione in sorted(serie["stagioni"].keys())  # Ordina le stagioni numericamente
-        ]
-        buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
+    print(f"DEBUG: mostra_stagioni chiamata. Serie ID: {serie_id}, Serie: {serie}")  # Debug
 
-# Funzione per mostrare gli episodi di una stagione
+    if serie:
+        # Crea i pulsanti per le stagioni
+        buttons = []
+        for stagione in sorted(serie["stagioni"].keys()):  # Ordina le stagioni numericamente
+            callback_data = f"{serie_id}|{stagione}"  # Crea il callback data
+            print(f"DEBUG: Pulsante creato - Stagione {stagione}, callback_data={callback_data}")  # Debug
+            buttons.append([InlineKeyboardButton(f"Stagione {stagione}", callback_data=callback_data)])
+
+        # Aggiungi un pulsante per tornare alla lista delle serie
+        buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
+
+        reply_markup = InlineKeyboardMarkup(buttons)
+
+        # Modifica il messaggio per mostrare le stagioni
+        try:
+            await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
+            print(f"DEBUG: Messaggio aggiornato per mostrare le stagioni di {serie['nome']}.")  # Debug
+        except Exception as e:
+            print(f"DEBUG: Errore nell'aggiornamento del messaggio delle stagioni: {e}")  # Debug
+    else:
+        print(f"DEBUG: Nessuna serie trovata con ID {serie_id}.")  # Debug
+        await query.message.edit_text("Errore: serie non trovata nel database.")
+
 async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -59,7 +72,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         serie_id, stagione = query.data.split("|")
         stagione = int(stagione)  # Converti in intero
-        print(f"DEBUG: serie_id={serie_id}, stagione={stagione}")  # Debug
+        print(f"DEBUG: mostra_episodi chiamata. Serie ID: {serie_id}, Stagione: {stagione}")  # Debug
     except ValueError as e:
         print(f"DEBUG: Errore nel parsing del callback data: {query.data}, errore: {e}")
         await query.message.edit_text("Errore: callback data non valido.")
@@ -91,7 +104,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             print("DEBUG: Messaggio aggiornato con la lista degli episodi.")  # Debug
         except Exception as e:
-            print(f"DEBUG: Errore nell'aggiornamento del messaggio: {e}")  # Debug
+            print(f"DEBUG: Errore nell'aggiornamento del messaggio degli episodi: {e}")  # Debug
     else:
         # Gestisci il caso in cui non ci siano episodi
         print(f"DEBUG: Nessun episodio trovato per serie_id={serie_id}, stagione={stagione}")  # Debug
