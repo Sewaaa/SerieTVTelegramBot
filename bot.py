@@ -15,15 +15,30 @@ async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
     """Scansiona i vecchi messaggi del canale per aggiungere i video esistenti al database."""
     print("DEBUG: Avvio scansione del canale...")
 
+    offset = None  # Partenza senza offset per scansionare dal primo messaggio
+    limit = 100  # Numero massimo di messaggi per richiesta (Telegram impone un limite)
+
     try:
-        async for message in context.bot.get_chat_history(CHANNEL_ID, limit=1000):
-            if message.video and message.caption:
-                # Usa la funzione leggi_file_id per aggiungere i video al database
-                update = Update(update_id=0, channel_post=message)
-                await leggi_file_id(update, context)
+        while True:
+            messages = await context.bot.get_updates(offset=offset, limit=limit)
+
+            if not messages:  # Se non ci sono messaggi, interrompi
+                break
+
+            for update in messages:
+                if update.channel_post and update.channel_post.video:
+                    # Aggiungi il video al database
+                    await leggi_file_id(update, context)
+
+                # Aggiorna l'offset per il messaggio successivo
+                offset = update.update_id + 1
+
+            print("DEBUG: Scansione completata fino all'ultimo offset.")
+
         print("DEBUG: Scansione del canale completata.")
     except Exception as e:
         print(f"DEBUG: Errore durante la scansione del canale: {e}")
+
 
 
 
