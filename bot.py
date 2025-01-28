@@ -207,12 +207,19 @@ def main():
     # Crea l'applicazione
     application = Application.builder().token(TOKEN).build()
 
-    # Handlers
+   # Funzione per tornare alla lista delle serie
+async def torna_alla_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    # Richiama la funzione /start per mostrare la lista delle serie
+    await start(update, context)
+
+    # Registra i callback handler
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^[^|]+$"))  # Per le serie
     application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))  # Per le stagioni
     application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))  # Per gli episodi
-    application.add_handler(CallbackQueryHandler(torna_indietro, pattern=r"^indietro$"))  # Per tornare indietro
+    application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))  # Per tornare alla lista
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
