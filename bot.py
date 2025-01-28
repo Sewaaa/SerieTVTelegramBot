@@ -60,16 +60,29 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stagione = int(stagione)  # Converti in intero
     serie = database.get(serie_id)
 
+    # Controlla se la serie e la stagione esistono nel database
     if serie and stagione in serie["stagioni"]:
-        # Mostra gli episodi della stagione selezionata
         episodi = serie["stagioni"][stagione]
+
+        # Crea i pulsanti per gli episodi
         buttons = [
             [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['file_id']}")]
             for ep in episodi
         ]
         buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
+
         reply_markup = InlineKeyboardMarkup(buttons)
-        await query.message.edit_text(f"Episodi di {serie['nome']} - Stagione {stagione}:", reply_markup=reply_markup)
+
+        # Mostra il messaggio con la lista degli episodi
+        await query.message.edit_text(
+            f"Episodi di {serie['nome']} - Stagione {stagione}:",
+            reply_markup=reply_markup
+        )
+    else:
+        # Gestisci il caso in cui non ci siano episodi
+        await query.message.edit_text(
+            f"Nessun episodio trovato per {serie['nome']} - Stagione {stagione}."
+        )
 
 # Funzione per inviare un episodio selezionato
 async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
