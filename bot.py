@@ -188,13 +188,13 @@ def main():
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^(?!play|indietro).*"))
-    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))
-    application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))
-    application.add_handler(CallbackQueryHandler(torna_indietro, pattern=r"^indietro$"))
+    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^[^|]+$"))  # Per le serie
+    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))  # Per le stagioni
+    application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))  # Per gli episodi
+    application.add_handler(CallbackQueryHandler(torna_indietro, pattern=r"^indietro$"))  # Per tornare indietro
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
-    
+
 
     # Avvia il bot
     application.run_polling()
