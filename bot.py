@@ -29,11 +29,17 @@ def carica_database():
     try:
         with open(DATABASE_FILE, "r", encoding="utf-8") as file:
             database = json.load(file)
+
+        # Correggi le chiavi delle stagioni per convertirle in interi
+        for serie in database.values():
+            serie["stagioni"] = {int(k): v for k, v in serie["stagioni"].items()}
+
         print("DEBUG: Database caricato correttamente.")
     except FileNotFoundError:
         print("DEBUG: Nessun file di database trovato, avvio con database vuoto.")
     except Exception as e:
         print(f"DEBUG: Errore durante il caricamento del database: {e}")
+
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,7 +75,9 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if serie:
         buttons = []
-        for stagione in sorted(serie["stagioni"].keys()):
+        # Converti le chiavi delle stagioni in numeri interi e ordinale
+        stagioni = sorted(map(int, serie["stagioni"].keys()))
+        for stagione in stagioni:
             callback_data = f"{serie_id}|{stagione}"
             print(f"DEBUG: Pulsante creato - Stagione {stagione}, callback_data={callback_data}")
             buttons.append([InlineKeyboardButton(f"Stagione {stagione}", callback_data=callback_data)])
@@ -167,6 +175,7 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_id = update.channel_post.video.file_id
         caption = update.channel_post.caption
 
+        # Estrai i dati dalla descrizione
         match = re.search(
             r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
         )
@@ -175,7 +184,7 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         serie_nome, stagione, episodio = match.groups()
-        stagione = int(stagione)
+        stagione = int(stagione)  # Converte la stagione in un intero
         episodio = int(episodio)
         titolo = f"S{stagione}EP{episodio}"
         episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
