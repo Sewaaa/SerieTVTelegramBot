@@ -1,25 +1,47 @@
 import os
-import re
-import telegram
-import asyncio
+import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+import re
 
 # Leggi le variabili d'ambiente
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
+DATABASE_FILE = "database.json"  # Percorso del file JSON per il database
 
 # Database per le serie TV
 database = {}
 
+# Funzione per salvare il database su un file JSON
+def salva_database():
+    try:
+        with open(DATABASE_FILE, "w", encoding="utf-8") as file:
+            json.dump(database, file, indent=4, ensure_ascii=False)
+        print("DEBUG: Database salvato correttamente.")
+    except Exception as e:
+        print(f"DEBUG: Errore durante il salvataggio del database: {e}")
+
+# Funzione per caricare il database da un file JSON
+def carica_database():
+    global database
+    try:
+        with open(DATABASE_FILE, "r", encoding="utf-8") as file:
+            database = json.load(file)
+        print("DEBUG: Database caricato correttamente.")
+    except FileNotFoundError:
+        print("DEBUG: Nessun file di database trovato, partenza con database vuoto.")
+    except Exception as e:
+        print(f"DEBUG: Errore durante il caricamento del database: {e}")
+
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Controlla se l'update proviene da un messaggio o da un callback
     if update.message:
         message = update.message
     elif update.callback_query:
         message = update.callback_query.message
     else:
-        return
+        return  # Nessun messaggio disponibile
 
     if not database:
         await message.reply_text("Non ci sono serie TV disponibili al momento.")
@@ -38,7 +60,7 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    serie_id = query.data
+    serie_id = query.data  # Ottieni l'ID della serie dal callback data
     serie = database.get(serie_id)
 
     if serie:
@@ -48,12 +70,9 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
             buttons.append([InlineKeyboardButton(f"Stagione {stagione}", callback_data=callback_data)])
 
         buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
-        reply_markup = InlineKeyboardMarkup(buttons)
 
-        try:
-            await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
-        except Exception as e:
-            print(f"Errore nell'aggiornamento del messaggio delle stagioni: {e}")
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
     else:
         await query.message.edit_text("Errore: serie non trovata nel database.")
 
@@ -65,7 +84,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         serie_id, stagione = query.data.split("|")
         stagione = int(stagione)
-    except ValueError as e:
+    except ValueError:
         await query.message.edit_text("Errore: callback data non valido.")
         return
 
@@ -73,20 +92,18 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if serie and stagione in serie["stagioni"]:
         episodi = serie["stagioni"][stagione]
+
         buttons = [
             [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['episodio_id']}")]
             for ep in episodi
         ]
         buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
-        reply_markup = InlineKeyboardMarkup(buttons)
 
-        try:
-            await query.message.edit_text(
-                f"Episodi di {serie['nome']} - Stagione {stagione}:",
-                reply_markup=reply_markup
-            )
-        except Exception as e:
-            print(f"Errore nell'aggiornamento del messaggio degli episodi: {e}")
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.message.edit_text(
+            f"Episodi di {serie['nome']} - Stagione {stagione}:",
+            reply_markup=reply_markup
+        )
     else:
         await query.message.edit_text(
             f"Nessun episodio trovato per {serie['nome']} - Stagione {stagione}."
@@ -111,6 +128,7 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text("Errore: episodio non trovato.")
     except Exception as e:
+        print(f"DEBUG: Errore nell'invio dell'episodio: {e}")
         await query.message.reply_text("Errore durante l'invio dell'episodio.")
 
 # Funzione per tornare alla lista delle serie
@@ -125,10 +143,12 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_id = update.channel_post.video.file_id
         caption = update.channel_post.caption
 
+        # Estrai i dati dalla descrizione
         match = re.search(
             r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
         )
         if not match:
+            print("DEBUG: Formato della descrizione non valido.")
             return
 
         serie_nome, stagione, episodio = match.groups()
@@ -153,26 +173,21 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "episodio_id": episodio_id
         })
 
+        print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
+
+        # Salva il database su file
+        salva_database()
+
 # Funzione per stampare il database nei log
 async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"Struttura del database:\n{database}")
+    print(f"DEBUG: Struttura del database:\n{database}")
     await update.message.reply_text("La struttura del database è stata stampata nei log.")
 
-# Funzione per recuperare i messaggi storici
-async def recupera_messaggi_storici(bot: telegram.Bot, chat_id: int):
-    offset = 0
-    while True:
-        updates = await bot.get_updates(offset=offset, timeout=10)
-        if not updates:
-            break
-
-        for update in updates:
-            if update.channel_post and update.channel_post.video:
-                await leggi_file_id(update, None)
-            offset = update.update_id + 1
-
 # Configurazione del bot
-async def main():
+def main():
+    # Carica il database da file
+    carica_database()
+
     if not TOKEN or not CHANNEL_ID:
         raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
@@ -186,11 +201,7 @@ async def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    # Recupera i messaggi storici
-    await recupera_messaggi_storici(application.bot, int(CHANNEL_ID))
-
-    # Avvia il bot
     application.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
