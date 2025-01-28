@@ -202,6 +202,8 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await conn.close()
 
 # Configurazione del bot
+import asyncio
+
 def main():
     if not TOKEN or not CHANNEL_ID or not DATABASE_URL:
         raise ValueError("TOKEN, CHANNEL_ID o DATABASE_URL non configurati nelle variabili d'ambiente.")
@@ -215,19 +217,17 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    async def avvia_app():
+    async def avvia_e_inizializza():
         # Connetti al database e inizializza le tabelle
         conn = await connetti_al_database()
         await inizializza_tabelle(conn)
         await conn.close()
 
-    # Esegui l'inizializzazione prima di avviare il polling
-    application.initialize()  # Inizializza l'applicazione
-    application.create_task(avvia_app())  # Crea una task per l'inizializzazione
-    application.run_polling()  # Avvia il polling
+    # Avvia il loop per inizializzare il database
+    asyncio.run(avvia_e_inizializza())  # Esegue avvia_e_inizializza in modo sincrono
 
-
-    application.run_polling(after_startup=avvia_app)
+    # Avvia il polling del bot
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
