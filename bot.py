@@ -68,8 +68,8 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Ottieni serie ID e numero stagione dal callback data
     try:
+        # Ottieni serie ID e numero stagione dal callback data
         serie_id, stagione = query.data.split("|")
         stagione = int(stagione)  # Converti in intero
         print(f"DEBUG: mostra_episodi chiamata. Serie ID: {serie_id}, Stagione: {stagione}")  # Debug
@@ -89,14 +89,13 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Crea i pulsanti per gli episodi
         buttons = [
-            [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['file_id']}")]
+            [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['episodio_id']}")]
             for ep in episodi
         ]
         buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
 
         reply_markup = InlineKeyboardMarkup(buttons)
 
-        # Mostra il messaggio con la lista degli episodi
         try:
             await query.message.edit_text(
                 f"Episodi di {serie['nome']} - Stagione {stagione}:",
@@ -106,7 +105,6 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"DEBUG: Errore nell'aggiornamento del messaggio degli episodi: {e}")  # Debug
     else:
-        # Gestisci il caso in cui non ci siano episodi
         print(f"DEBUG: Nessun episodio trovato per serie_id={serie_id}, stagione={stagione}")  # Debug
         await query.message.edit_text(
             f"Nessun episodio trovato per {serie['nome']} - Stagione {stagione}."
@@ -118,9 +116,28 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Ottieni il file_id dell'episodio selezionato
-    file_id = query.data.split("|")[1]
-    await query.message.reply_video(video=file_id)
+    try:
+        # Ottieni episodio_id dal callback data
+        episodio_id = query.data.split("|")[1]
+        print(f"DEBUG: invia_episodio chiamata. Episodio ID: {episodio_id}")  # Debug
+
+        # Cerca il file_id corrispondente nel database
+        for serie in database.values():
+            for stagioni in serie["stagioni"].values():
+                for episodio in stagioni:
+                    if episodio["episodio_id"] == episodio_id:
+                        file_id = episodio["file_id"]
+                        await query.message.reply_video(video=file_id)
+                        print(f"DEBUG: Video inviato per episodio ID: {episodio_id}")  # Debug
+                        return
+
+        # Se non troviamo l'episodio
+        print(f"DEBUG: Episodio ID non trovato: {episodio_id}")  # Debug
+        await query.message.reply_text("Errore: episodio non trovato.")
+    except Exception as e:
+        print(f"DEBUG: Errore nell'invio dell'episodio: {e}")  # Debug
+        await query.message.reply_text("Errore durante l'invio dell'episodio.")
+
 
 # Funzione per tornare alla lista delle serie
 async def torna_indietro(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,7 +156,7 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
         )
         if not match:
-            print("Formato della descrizione non valido.")
+            print("DEBUG: Formato della descrizione non valido.")
             return
 
         serie_nome, stagione, episodio = match.groups()
@@ -151,8 +168,11 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Costruisci il titolo in automatico (es. "S1EP1")
         titolo = f"S{stagione}EP{episodio}"
 
+        # Costruisci un identificatore univoco per l'episodio
+        episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
+
         # Aggiungi la serie al database se non esiste
-        serie_id = serie_nome.lower().replace(" ", "_")  # Usa un ID unico per ogni serie
+        serie_id = serie_nome.lower().replace(" ", "_")
         if serie_id not in database:
             database[serie_id] = {
                 "nome": serie_nome,
@@ -166,7 +186,8 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Aggiungi l'episodio alla stagione
         database[serie_id]["stagioni"][stagione].append({
             "episodio": titolo,
-            "file_id": file_id
+            "file_id": file_id,
+            "episodio_id": episodio_id
         })
 
         print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
