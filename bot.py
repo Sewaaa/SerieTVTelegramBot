@@ -3,6 +3,8 @@ import asyncpg
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 import re
+import asyncio
+import signal
 
 # Leggi le variabili d'ambiente
 TOKEN = os.getenv("TOKEN")
@@ -15,6 +17,9 @@ db_pool = None
 # Funzione per inizializzare la connessione al database
 async def init_db():
     global db_pool
+    if db_pool is None:
+        db_pool = await asyncpg.create_pool(DATABASE_URL)
+        
     async with db_pool.acquire() as conn:
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS series (
@@ -197,9 +202,19 @@ async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("La struttura del database è stata stampata nei log.")
 
-def main():
+async def stop_bot(application: Application):
+    """Funzione per fermare il bot in modo pulito"""
+    await application.stop()
+    if db_pool:
+        await db_pool.close()
+
+async def main():
     if not TOKEN or not CHANNEL_ID or not DATABASE_URL:
         raise ValueError("TOKEN, CHANNEL_ID o DATABASE_URL non configurati nelle variabili d'ambiente.")
+
+    # Inizializza il database
+    await init_db()
+    print("Database inizializzato con successo!")
 
     # Crea l'applicazione
     application = Application.builder().token(TOKEN).build()
@@ -213,24 +228,18 @@ def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    # Inizializza il database e avvia il polling
-    async def start_bot():
-        global db_pool
-        # Inizializza il pool di connessioni al database
-        db_pool = await asyncpg.create_pool(DATABASE_URL)
-        await init_db()
-        
-        print("Database inizializzato con successo!")
-        print("Bot in esecuzione...")
-        
-        # Avvia il bot
-        await application.initialize()
-        await application.start()
-        await application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Gestione del segnale di interruzione
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, lambda: loop.create_task(stop_bot(application)))
+    loop.add_signal_handler(signal.SIGTERM, lambda: loop.create_task(stop_bot(application)))
 
-    # Avvia il bot
-    import asyncio
-    asyncio.run(start_bot())
+    print("Bot in esecuzione...")
+    await application.initialize()
+    await application.start()
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("Bot fermato")
