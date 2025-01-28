@@ -1,6 +1,7 @@
 import os
 import re
 import telegram
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -185,9 +186,10 @@ def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    bot = application.bot
-    bot.loop.run_until_complete(recupera_messaggi_storici(bot, int(CHANNEL_ID)))
+    # Recupera i messaggi storici
+    asyncio.run(recupera_messaggi_storici(application.bot, int(CHANNEL_ID)))
 
+    # Avvia il bot
     application.run_polling()
 
 if __name__ == "__main__":
