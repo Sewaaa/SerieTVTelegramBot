@@ -24,30 +24,21 @@ async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
     """Scansiona i vecchi messaggi del canale per aggiungere i video esistenti al database."""
     print("DEBUG: Avvio scansione del canale...")
 
-    offset = None  # Partenza senza offset per scansionare dal primo messaggio
-    limit = 10  # Numero massimo di messaggi per richiesta (ridotto per diminuire il carico)
-
     try:
-        while True:
-            updates = await context.bot.get_updates(offset=offset, limit=limit, timeout=10)
-
-            if not updates:  # Se non ci sono messaggi, interrompi
-                break
-
-            for update in updates:
-                if update.channel_post and update.channel_post.video:
-                    # Aggiungi il video al database
-                    await leggi_file_id(update, context)
-
-                # Aggiorna l'offset per il messaggio successivo
-                offset = update.update_id + 1
-
-            # Aggiungi un ritardo più lungo tra le richieste per ridurre il carico
-            await asyncio.sleep(2)  # Ritardo di 2 secondi
+        # Ottieni i dettagli del canale
+        chat = await context.bot.get_chat(CHANNEL_ID)
+        
+        # Scansiona i messaggi del canale
+        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=100):
+            if message.video and message.caption:
+                # Usa la funzione leggi_file_id per elaborare i messaggi con video
+                update = Update(update_id=0, channel_post=message)
+                await leggi_file_id(update, context)
 
         print("DEBUG: Scansione del canale completata.")
     except Exception as e:
         print(f"DEBUG: Errore durante la scansione del canale: {e}")
+
 
 # Funzione per aggiungere video al database
 async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
