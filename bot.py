@@ -1,14 +1,39 @@
 import os
+import json
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-import re
 
-# Leggi le variabili d'ambiente
+# Variabili d'ambiente
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
+# Percorso del file per il database
+DATABASE_FILE = "/data/database.json"  # Assicurati che il volume persistente su Railway punti a /data
+
 # Database per le serie TV
 database = {}
+
+# Funzione per salvare il database su un file JSON
+def salva_database():
+    try:
+        with open(DATABASE_FILE, "w", encoding="utf-8") as file:
+            json.dump(database, file, indent=4, ensure_ascii=False)
+        print("DEBUG: Database salvato correttamente.")
+    except Exception as e:
+        print(f"DEBUG: Errore durante il salvataggio del database: {e}")
+
+# Funzione per caricare il database da un file JSON
+def carica_database():
+    global database
+    try:
+        with open(DATABASE_FILE, "r", encoding="utf-8") as file:
+            database = json.load(file)
+        print("DEBUG: Database caricato correttamente.")
+    except FileNotFoundError:
+        print("DEBUG: Nessun file di database trovato, avvio con database vuoto.")
+    except Exception as e:
+        print(f"DEBUG: Errore durante il caricamento del database: {e}")
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -173,6 +198,9 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
 
+        # Salva il database su file
+        salva_database()
+
 # Funzione per stampare il database nei log
 async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"DEBUG: Struttura del database:\n{database}")
@@ -180,19 +208,20 @@ async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Configurazione del bot
 def main():
+    carica_database()
+
     if not TOKEN or not CHANNEL_ID:
         raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^(?!indietro$)[^|]+$"))  # Per le serie
-    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))  # Per le stagioni
-    application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))  # Per gli episodi
-    application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))  # Per tornare alla lista
+    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^(?!indietro$)[^|]+$"))
+    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))
+    application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))
+    application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
-
 
     application.run_polling()
 
