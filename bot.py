@@ -172,7 +172,7 @@ async def recupera_messaggi_storici(bot: telegram.Bot, chat_id: int):
             offset = update.update_id + 1
 
 # Configurazione del bot
-def main():
+async def main():
     if not TOKEN or not CHANNEL_ID:
         raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
@@ -187,10 +187,10 @@ def main():
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
     # Recupera i messaggi storici
-    asyncio.run(recupera_messaggi_storici(application.bot, int(CHANNEL_ID)))
+    await recupera_messaggi_storici(application.bot, int(CHANNEL_ID))
 
     # Avvia il bot
     application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
