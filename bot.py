@@ -8,6 +8,7 @@ import re
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 DATABASE_URL = os.getenv("DATABASE_URL")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Aggiungi l'URL del webhook
 
 # Funzione per inizializzare la connessione al database
 async def init_db():
@@ -204,8 +205,8 @@ async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Configurazione del bot
 def main():
-    if not TOKEN or not CHANNEL_ID or not DATABASE_URL:
-        raise ValueError("TOKEN, CHANNEL_ID o DATABASE_URL non configurati nelle variabili d'ambiente.")
+    if not TOKEN or not CHANNEL_ID or not DATABASE_URL or not WEBHOOK_URL:
+        raise ValueError("TOKEN, CHANNEL_ID, DATABASE_URL o WEBHOOK_URL non configurati nelle variabili d'ambiente.")
     
     application = Application.builder().token(TOKEN).build()
 
@@ -217,7 +218,13 @@ def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    application.run_polling()
+    # Imposta il webhook
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.getenv("PORT", "8443")),
+        url_path=TOKEN,
+        webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
+    )
 
 if __name__ == "__main__":
     main()
