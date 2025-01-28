@@ -12,12 +12,19 @@ database = {}
 
 # Funzione per la scansione dei vecchi video dal canale
 async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
-    async for message in context.bot.get_chat_history(CHANNEL_ID, limit=1000):
+    """Scansiona i vecchi messaggi del canale per aggiungere i video esistenti al database."""
+    print("DEBUG: Avvio scansione del canale...")
+
+    # Usa get_chat per ottenere i messaggi
+    chat = await context.bot.get_chat(CHANNEL_ID)
+    async for message in chat.iter_history(limit=1000):  # Scansiona fino a 1000 messaggi
         if message.video and message.caption:
             # Usa la funzione leggi_file_id per aggiungere i video al database
             update = Update(update_id=0, channel_post=message)
             await leggi_file_id(update, context)
+    
     print("DEBUG: Scansione del canale completata.")
+
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
