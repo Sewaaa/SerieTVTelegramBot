@@ -56,13 +56,23 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     # Ottieni serie ID e numero stagione dal callback data
-    serie_id, stagione = query.data.split("|")
-    stagione = int(stagione)  # Converti in intero
+    try:
+        serie_id, stagione = query.data.split("|")
+        stagione = int(stagione)  # Converti in intero
+        print(f"DEBUG: serie_id={serie_id}, stagione={stagione}")  # Debug
+    except ValueError as e:
+        print(f"DEBUG: Errore nel parsing del callback data: {query.data}, errore: {e}")
+        await query.message.edit_text("Errore: callback data non valido.")
+        return
+
+    # Recupera la serie dal database
     serie = database.get(serie_id)
+    print(f"DEBUG: Serie trovata: {serie}")  # Debug
 
     # Controlla se la serie e la stagione esistono nel database
     if serie and stagione in serie["stagioni"]:
         episodi = serie["stagioni"][stagione]
+        print(f"DEBUG: Episodi trovati: {episodi}")  # Debug
 
         # Crea i pulsanti per gli episodi
         buttons = [
@@ -74,14 +84,20 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(buttons)
 
         # Mostra il messaggio con la lista degli episodi
-        await query.message.edit_text(
-            f"Episodi di {serie['nome']} - Stagione {stagione}:",
-            reply_markup=reply_markup
-        )
+        try:
+            await query.message.edit_text(
+                f"Episodi di {serie['nome']} - Stagione {stagione}:",
+                reply_markup=reply_markup
+            )
+            print("DEBUG: Messaggio aggiornato con la lista degli episodi.")  # Debug
+        except Exception as e:
+            print(f"DEBUG: Errore nell'aggiornamento del messaggio: {e}")  # Debug
     else:
         # Gestisci il caso in cui non ci siano episodi
+        print(f"DEBUG: Nessun episodio trovato per serie_id={serie_id}, stagione={stagione}")  # Debug
         await query.message.edit_text(
             f"Nessun episodio trovato per {serie['nome']} - Stagione {stagione}."
+            if serie else "Errore: serie non trovata nel database."
         )
 
 # Funzione per inviare un episodio selezionato
