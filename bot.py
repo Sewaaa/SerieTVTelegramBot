@@ -186,12 +186,13 @@ def main():
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^[^|]+$"))
-    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))
-    application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))
-    application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
+    application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^(?!indietro$)[^|]+$"))  # Per le serie
+    application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))  # Per le stagioni
+    application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))  # Per gli episodi
+    application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))  # Per tornare alla lista
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
+
 
     application.run_polling()
 
