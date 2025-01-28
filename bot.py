@@ -129,6 +129,12 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
 
+#stampa del db nei log
+async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Stampa la struttura del database nei log
+    print(f"DEBUG: Struttura del database:\n{database}")
+    await update.message.reply_text("La struttura del database è stata stampata nei log.")
+
 # Configurazione del bot
 def main():
     # Controllo che TOKEN e CHANNEL_ID siano presenti
@@ -144,7 +150,9 @@ def main():
     application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))
     application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))
     application.add_handler(CallbackQueryHandler(torna_indietro, pattern=r"^indietro$"))
+    application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
+    
 
     # Avvia il bot
     application.run_polling()
