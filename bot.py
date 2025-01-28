@@ -8,74 +8,44 @@ import re
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 DATABASE_URL = os.getenv("DATABASE_URL")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Aggiungi l'URL del webhook
+
+# Pool di connessioni al database
+db_pool = None
 
 # Funzione per inizializzare la connessione al database
 async def init_db():
-    conn = await asyncpg.connect(DATABASE_URL)
-    await conn.execute('''
-        CREATE TABLE IF NOT EXISTS series (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL
-        )
-    ''')
-    await conn.execute('''
-        CREATE TABLE IF NOT EXISTS seasons (
-            id SERIAL PRIMARY KEY,
-            series_id INTEGER NOT NULL,
-            number INTEGER NOT NULL,
-            FOREIGN KEY (series_id) REFERENCES series (id)
-        )
-    ''')
-    await conn.execute('''
-        CREATE TABLE IF NOT EXISTS episodes (
-            id SERIAL PRIMARY KEY,
-            season_id INTEGER NOT NULL,
-            number INTEGER NOT NULL,
-            file_id TEXT NOT NULL,
-            FOREIGN KEY (season_id) REFERENCES seasons (id)
-        )
-    ''')
-    await conn.close()
+    global db_pool
+    db_pool = await asyncpg.create_pool(DATABASE_URL)
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS series (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS seasons (
+                id SERIAL PRIMARY KEY,
+                series_id INTEGER NOT NULL,
+                number INTEGER NOT NULL,
+                FOREIGN KEY (series_id) REFERENCES series (id)
+            )
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS episodes (
+                id SERIAL PRIMARY KEY,
+                season_id INTEGER NOT NULL,
+                number INTEGER NOT NULL,
+                file_id TEXT NOT NULL,
+                FOREIGN KEY (season_id) REFERENCES seasons (id)
+            )
+        ''')
 
 # Funzione per ottenere le serie dal database
 async def get_series():
-    conn = await asyncpg.connect(DATABASE_URL)
-    rows = await conn.fetch('SELECT * FROM series')
-    await conn.close()
-    return rows
-
-# Funzione per aggiungere una serie al database
-async def add_series(name):
-    conn = await asyncpg.connect(DATABASE_URL)
-    await conn.execute('INSERT INTO series(name) VALUES($1)', name)
-    await conn.close()
-
-# Funzione per ottenere le stagioni di una serie dal database
-async def get_seasons(series_id):
-    conn = await asyncpg.connect(DATABASE_URL)
-    rows = await conn.fetch('SELECT * FROM seasons WHERE series_id = $1', series_id)
-    await conn.close()
-    return rows
-
-# Funzione per aggiungere una stagione a una serie nel database
-async def add_season(series_id, number):
-    conn = await asyncpg.connect(DATABASE_URL)
-    await conn.execute('INSERT INTO seasons(series_id, number) VALUES($1, $2)', series_id, number)
-    await conn.close()
-
-# Funzione per ottenere gli episodi di una stagione dal database
-async def get_episodes(season_id):
-    conn = await asyncpg.connect(DATABASE_URL)
-    rows = await conn.fetch('SELECT * FROM episodes WHERE season_id = $1', season_id)
-    await conn.close()
-    return rows
-
-# Funzione per aggiungere un episodio a una stagione nel database
-async def add_episode(season_id, number, file_id):
-    conn = await asyncpg.connect(DATABASE_URL)
-    await conn.execute('INSERT INTO episodes(season_id, number, file_id) VALUES($1, $2, $3)', season_id, number, file_id)
-    await conn.close()
+    async with db_pool.acquire() as conn:
+        return await conn.fetch('SELECT * FROM series')
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -101,18 +71,18 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     serie_id = int(query.data)
-    seasons = await get_seasons(serie_id)
+    async with db_pool.acquire() as conn:
+        serie = await conn.fetchrow('SELECT * FROM series WHERE id = $1', serie_id)
+        seasons = await conn.fetch('SELECT * FROM seasons WHERE series_id = $1 ORDER BY number', serie_id)
 
-    if seasons:
-        buttons = []
-        for season in seasons:
-            callback_data = f"{serie_id}|{season['number']}"
-            buttons.append([InlineKeyboardButton(f"Stagione {season['number']}", callback_data=callback_data)])
-
+    if serie and seasons:
+        buttons = [
+            [InlineKeyboardButton(f"Stagione {season['number']}", callback_data=f"{serie_id}|{season['number']}")]
+            for season in seasons
+        ]
         buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
         reply_markup = InlineKeyboardMarkup(buttons)
-
-        await query.message.edit_text(f"Scegli una stagione di {seasons[0]['name']}:", reply_markup=reply_markup)
+        await query.message.edit_text(f"Scegli una stagione di {serie['name']}:", reply_markup=reply_markup)
     else:
         await query.message.edit_text("Errore: serie non trovata nel database.")
 
@@ -123,19 +93,26 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         serie_id, stagione = query.data.split("|")
+        serie_id = int(serie_id)
         stagione = int(stagione)
     except ValueError:
         await query.message.edit_text("Errore: callback data non valido.")
         return
 
-    episodes = await get_episodes(stagione)
+    async with db_pool.acquire() as conn:
+        serie = await conn.fetchrow('SELECT * FROM series WHERE id = $1', serie_id)
+        season = await conn.fetchrow('SELECT * FROM seasons WHERE series_id = $1 AND number = $2', serie_id, stagione)
+        if season:
+            episodes = await conn.fetch('SELECT * FROM episodes WHERE season_id = $1 ORDER BY number', season['id'])
 
-    if episodes:
-        buttons = [[InlineKeyboardButton(ep["number"], callback_data=f"play|{ep['id']}")] for ep in episodes]
-        buttons.append([InlineKeyboardButton("Torna indietro", callback_data=serie_id)])
+    if serie and season and episodes:
+        buttons = [
+            [InlineKeyboardButton(f"Episodio {ep['number']}", callback_data=f"play|{ep['id']}")]
+            for ep in episodes
+        ]
+        buttons.append([InlineKeyboardButton("Torna indietro", callback_data=str(serie_id))])
         reply_markup = InlineKeyboardMarkup(buttons)
-
-        await query.message.edit_text(f"Episodi di {episodes[0]['name']} - Stagione {stagione}:", reply_markup=reply_markup)
+        await query.message.edit_text(f"Episodi di {serie['name']} - Stagione {stagione}:", reply_markup=reply_markup)
     else:
         await query.message.edit_text("Errore: nessun episodio trovato per questa stagione.")
 
@@ -144,10 +121,14 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    episodio_id = query.data.split("|")[1]
-    conn = await asyncpg.connect(DATABASE_URL)
-    episodio = await conn.fetchrow('SELECT file_id FROM episodes WHERE id = $1', episodio_id)
-    await conn.close()
+    try:
+        episodio_id = int(query.data.split("|")[1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("Errore: episodio non valido.")
+        return
+
+    async with db_pool.acquire() as conn:
+        episodio = await conn.fetchrow('SELECT file_id FROM episodes WHERE id = $1', episodio_id)
 
     if episodio:
         await query.message.reply_video(video=episodio["file_id"])
@@ -168,45 +149,63 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         match = re.search(r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE)
         if not match:
+            print("DEBUG: Formato della descrizione non valido.")
             return
 
         serie_nome, stagione, episodio = match.groups()
         stagione = int(stagione)
         episodio = int(episodio)
 
-        conn = await asyncpg.connect(DATABASE_URL)
-        serie = await conn.fetchrow('SELECT id FROM series WHERE name = $1', serie_nome)
-        if not serie:
-            await conn.execute('INSERT INTO series(name) VALUES($1)', serie_nome)
+        async with db_pool.acquire() as conn:
+            # Trova o crea la serie
             serie = await conn.fetchrow('SELECT id FROM series WHERE name = $1', serie_nome)
+            if not serie:
+                serie = await conn.fetchrow(
+                    'INSERT INTO series(name) VALUES($1) RETURNING id', 
+                    serie_nome
+                )
 
-        season = await conn.fetchrow('SELECT id FROM seasons WHERE series_id = $1 AND number = $2', serie["id"], stagione)
-        if not season:
-            await conn.execute('INSERT INTO seasons(series_id, number) VALUES($1, $2)', serie["id"], stagione)
-            season = await conn.fetchrow('SELECT id FROM seasons WHERE series_id = $1 AND number = $2', serie["id"], stagione)
+            # Trova o crea la stagione
+            season = await conn.fetchrow(
+                'SELECT id FROM seasons WHERE series_id = $1 AND number = $2', 
+                serie['id'], stagione
+            )
+            if not season:
+                season = await conn.fetchrow(
+                    'INSERT INTO seasons(series_id, number) VALUES($1, $2) RETURNING id',
+                    serie['id'], stagione
+                )
 
-        await conn.execute('INSERT INTO episodes(season_id, number, file_id) VALUES($1, $2, $3)', season["id"], episodio, file_id)
-        await conn.close()
+            # Aggiungi l'episodio
+            await conn.execute(
+                'INSERT INTO episodes(season_id, number, file_id) VALUES($1, $2, $3)',
+                season['id'], episodio, file_id
+            )
+
+        print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}")
 
 # Funzione per stampare il database nei log
 async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    conn = await asyncpg.connect(DATABASE_URL)
-    series = await conn.fetch('SELECT * FROM series')
-    for serie in series:
-        print(f"Serie: {serie['name']}")
-        seasons = await conn.fetch('SELECT * FROM seasons WHERE series_id = $1', serie["id"])
-        for season in seasons:
-            print(f"  Stagione: {season['number']}")
-            episodes = await conn.fetch('SELECT * FROM episodes WHERE season_id = $1', season["id"])
-            for episode in episodes:
-                print(f"    Episodio: {episode['number']} - File ID: {episode['file_id']}")
-    await conn.close()
+    async with db_pool.acquire() as conn:
+        series = await conn.fetch('SELECT * FROM series')
+        for serie in series:
+            print(f"Serie: {serie['name']}")
+            seasons = await conn.fetch('SELECT * FROM seasons WHERE series_id = $1', serie['id'])
+            for season in seasons:
+                print(f"  Stagione: {season['number']}")
+                episodes = await conn.fetch('SELECT * FROM episodes WHERE season_id = $1', season['id'])
+                for episode in episodes:
+                    print(f"    Episodio: {episode['number']} - File ID: {episode['file_id']}")
+    
     await update.message.reply_text("La struttura del database è stata stampata nei log.")
 
 # Configurazione del bot
-def main():
-    if not TOKEN or not CHANNEL_ID or not DATABASE_URL or not WEBHOOK_URL:
-        raise ValueError("TOKEN, CHANNEL_ID, DATABASE_URL o WEBHOOK_URL non configurati nelle variabili d'ambiente.")
+async def main():
+    if not TOKEN or not CHANNEL_ID or not DATABASE_URL:
+        raise ValueError("TOKEN, CHANNEL_ID o DATABASE_URL non configurati nelle variabili d'ambiente.")
+    
+    # Inizializza il pool di connessioni al database
+    await init_db()
     
     application = Application.builder().token(TOKEN).build()
 
@@ -218,13 +217,11 @@ def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    # Imposta il webhook
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.getenv("PORT", "8443")),
-        url_path=TOKEN,
-        webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
-    )
+    # Avvia il bot con il polling
+    await application.initialize()
+    await application.start()
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
