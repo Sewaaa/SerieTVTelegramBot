@@ -2,6 +2,8 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 import re
+import asyncio  
+
 
 # Leggi le variabili d'ambiente
 TOKEN = os.getenv("TOKEN")
@@ -16,7 +18,7 @@ async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
     print("DEBUG: Avvio scansione del canale...")
 
     offset = None  # Partenza senza offset per scansionare dal primo messaggio
-    limit = 100  # Numero massimo di messaggi per richiesta (Telegram impone un limite)
+    limit = 100  # Numero massimo di messaggi per richiesta
 
     try:
         while True:
@@ -33,13 +35,12 @@ async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
                 # Aggiorna l'offset per il messaggio successivo
                 offset = update.update_id + 1
 
-            print("DEBUG: Scansione completata fino all'ultimo offset.")
+            # Aggiungi un piccolo ritardo tra le richieste per evitare sovraccarico
+            await asyncio.sleep(0.5)  # Ritardo di 500ms
 
         print("DEBUG: Scansione del canale completata.")
     except Exception as e:
         print(f"DEBUG: Errore durante la scansione del canale: {e}")
-
-
 
 
 # Funzione per il comando /start
@@ -216,7 +217,8 @@ def main():
         raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
     # Crea l'applicazione
-    application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token(TOKEN).concurrent_updates(5).build()
+
 
     # Registra i comandi e i callback
     application.add_handler(CommandHandler("start", start))
