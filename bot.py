@@ -15,8 +15,6 @@ db_pool = None
 # Funzione per inizializzare la connessione al database
 async def init_db():
     global db_pool
-    db_pool = await asyncpg.create_pool(DATABASE_URL)
-    
     async with db_pool.acquire() as conn:
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS series (
@@ -199,16 +197,14 @@ async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("La struttura del database è stata stampata nei log.")
 
-# Configurazione del bot
-async def main():
+def main():
     if not TOKEN or not CHANNEL_ID or not DATABASE_URL:
         raise ValueError("TOKEN, CHANNEL_ID o DATABASE_URL non configurati nelle variabili d'ambiente.")
-    
-    # Inizializza il pool di connessioni al database
-    await init_db()
-    
+
+    # Crea l'applicazione
     application = Application.builder().token(TOKEN).build()
 
+    # Aggiungi gli handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(mostra_stagioni, pattern=r"^(?!indietro$)[^|]+$"))
     application.add_handler(CallbackQueryHandler(mostra_episodi, pattern=r".*\|\d+"))
@@ -217,11 +213,24 @@ async def main():
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    # Avvia il bot con il polling
-    await application.initialize()
-    await application.start()
-    await application.run_polling()
+    # Inizializza il database e avvia il polling
+    async def start_bot():
+        global db_pool
+        # Inizializza il pool di connessioni al database
+        db_pool = await asyncpg.create_pool(DATABASE_URL)
+        await init_db()
+        
+        print("Database inizializzato con successo!")
+        print("Bot in esecuzione...")
+        
+        # Avvia il bot
+        await application.initialize()
+        await application.start()
+        await application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    # Avvia il bot
+    import asyncio
+    asyncio.run(start_bot())
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
