@@ -1,9 +1,16 @@
 import os
 import asyncio
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.request import HTTPXRequest
 import re
+
+# Configurazione dei log
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.DEBUG  # Cambia a DEBUG per abilitare log dettagliati
+)
 
 # Leggi le variabili d'ambiente
 TOKEN = os.getenv("TOKEN")
@@ -18,11 +25,11 @@ async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
     print("DEBUG: Avvio scansione del canale...")
 
     offset = None  # Partenza senza offset per scansionare dal primo messaggio
-    limit = 50  # Numero massimo di messaggi per richiesta
+    limit = 10  # Numero massimo di messaggi per richiesta (ridotto per diminuire il carico)
 
     try:
         while True:
-            updates = await context.bot.get_updates(offset=offset, limit=limit, timeout=5)
+            updates = await context.bot.get_updates(offset=offset, limit=limit, timeout=10)
 
             if not updates:  # Se non ci sono messaggi, interrompi
                 break
@@ -36,7 +43,7 @@ async def scansione_canale(context: ContextTypes.DEFAULT_TYPE):
                 offset = update.update_id + 1
 
             # Aggiungi un ritardo più lungo tra le richieste per ridurre il carico
-            await asyncio.sleep(1)  # Ritardo di 1 secondo
+            await asyncio.sleep(2)  # Ritardo di 2 secondi
 
         print("DEBUG: Scansione del canale completata.")
     except Exception as e:
@@ -147,10 +154,10 @@ def main():
         raise ValueError("TOKEN o CHANNEL_ID non configurati nelle variabili d'ambiente.")
 
     # Configura il pool di connessioni
-    request = HTTPXRequest(connection_pool_size=8)
+    request = HTTPXRequest(connection_pool_size=8, read_timeout=10.0, write_timeout=10.0, connect_timeout=10.0)
 
     # Crea l'applicazione con il pool configurato
-    application = Application.builder().token(TOKEN).request(request).concurrent_updates(4).build()
+    application = Application.builder().token(TOKEN).request(request).concurrent_updates(2).build()
 
     # Registra i comandi e i callback
     application.add_handler(CommandHandler("start", start))
