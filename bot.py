@@ -215,11 +215,17 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    # Inizializza le tabelle
     async def avvia_app():
+        # Connetti al database e inizializza le tabelle
         conn = await connetti_al_database()
         await inizializza_tabelle(conn)
         await conn.close()
+
+    # Esegui l'inizializzazione prima di avviare il polling
+    application.initialize()  # Inizializza l'applicazione
+    application.create_task(avvia_app())  # Crea una task per l'inizializzazione
+    application.run_polling()  # Avvia il polling
+
 
     application.run_polling(after_startup=avvia_app)
 
