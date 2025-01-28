@@ -203,7 +203,7 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await conn.close()
 
 # Configurazione del bot
-def main():
+async def main():
     if not TOKEN or not CHANNEL_ID or not DATABASE_URL:
         raise ValueError("TOKEN, CHANNEL_ID o DATABASE_URL non configurati nelle variabili d'ambiente.")
 
@@ -216,19 +216,25 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
 
-    async def avvia_app():
-        # Connetti al database e inizializza le tabelle
-        conn = await connetti_al_database()
-        await inizializza_tabelle(conn)
-        await conn.close()
-        print("DEBUG: Inizializzazione completata. Avvio del bot...")
+    # Connetti al database e inizializza le tabelle
+    conn = await connetti_al_database()
+    await inizializza_tabelle(conn)
+    await conn.close()
+    print("DEBUG: Inizializzazione completata. Avvio del bot...")
 
-        # Avvia il polling del bot
-        await application.run_polling()
+    # Avvia il polling del bot
+    await application.run_polling()
 
-    # Utilizza asyncio.run per avviare l'applicazione
-    asyncio.run(avvia_app())
-
+# Verifica se un loop è già in esecuzione, altrimenti avvia l'app
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except RuntimeError as e:
+        if str(e) == "This event loop is already running":
+            print("DEBUG: Loop già in esecuzione, avvio manuale del bot.")
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(main())
+        else:
+            raise
+
 
