@@ -19,7 +19,7 @@ def get_user_info(update: Update):
     """Restituisce l'username, l'ID e il nome dell'utente che interagisce con il bot."""
     user = update.effective_user
     username = f"@{user.username}" if user.username else "Sconosciuto"
-    return f"[User: {username} | ID: {user.id} | Nome: {user.first_name}]"
+    return f"[{username} | {user.first_name}]"
 
 
 # Funzione per salvare il database su un file JSON
