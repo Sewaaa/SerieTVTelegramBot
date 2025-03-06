@@ -120,8 +120,9 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"DEBUG: Serie trovata: {serie}")
 
     if serie and stagione in serie["stagioni"]:
-        episodi = serie["stagioni"][stagione]
-        print(f"[{get_user_info(update)}] DEBUG: Episodi trovati: {episodi}")
+        # Ordina gli episodi in base al numero di episodio
+        episodi = sorted(serie["stagioni"][stagione], key=lambda ep: ep.get("numero", 0))
+        print(f"[{get_user_info(update)}] DEBUG: Episodi ordinati: {episodi}")
 
         buttons = [
             [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['episodio_id']}")]
@@ -214,10 +215,12 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if stagione not in database[serie_id]["stagioni"]:
             database[serie_id]["stagioni"][stagione] = []
 
+        # Aggiunta del campo "numero" per permettere l'ordinamento
         database[serie_id]["stagioni"][stagione].append({
             "episodio": titolo,
             "file_id": file_id,
-            "episodio_id": episodio_id
+            "episodio_id": episodio_id,
+            "numero": episodio
         })
 
         print(f"DEBUG: Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
