@@ -30,22 +30,56 @@ def salva_database():
     except Exception as e:
         print(f"DEBUG: Errore durante il salvataggio del database: {e}")
 
-# Funzione per caricare il database da un file JSON
 def carica_database():
+    """Carica il database dal file e normalizza i dati:
+       - Converte le chiavi stagioni in interi
+       - Se mancano i campi 'numero' negli episodi, li aggiunge automaticamente
+         parsando la stringa 'episodio' (es. S2EP5 -> numero = 5)."""
     global database
     try:
         with open(DATABASE_FILE, "r", encoding="utf-8") as file:
             database = json.load(file)
-
-        # Correggi le chiavi delle stagioni per convertirle in interi
-        for serie in database.values():
-            serie["stagioni"] = {int(k): v for k, v in serie["stagioni"].items()}
-
         print("DEBUG: Database caricato correttamente.")
     except FileNotFoundError:
         print("DEBUG: Nessun file di database trovato, avvio con database vuoto.")
+        database = {}
+        return
     except Exception as e:
         print(f"DEBUG: Errore durante il caricamento del database: {e}")
+        database = {}
+        return
+
+    # 1) Converte le chiavi delle stagioni in interi
+    for serie_id, serie_data in database.items():
+        if "stagioni" in serie_data:
+            # Converte la chiave in int
+            serie_data["stagioni"] = {
+                int(stagione_num): episodi
+                for stagione_num, episodi in serie_data["stagioni"].items()
+            }
+
+    # 2) Aggiunge automaticamente "numero" negli episodi che non lo hanno
+    changed = False  # per capire se dobbiamo risalvare il file
+    for serie_id, serie_data in database.items():
+        stagioni = serie_data.get("stagioni", {})
+        for stg_num, episodi_list in stagioni.items():
+            for ep_data in episodi_list:
+                if "numero" not in ep_data:
+                    # Esempio ep_data["episodio"] = "S2EP5"
+                    match = re.match(r"S(\d+)EP(\d+)", ep_data["episodio"], re.IGNORECASE)
+                    if match:
+                        numero_episodio = int(match.group(2))
+                        ep_data["numero"] = numero_episodio
+                        changed = True
+                        print(f"DEBUG: Aggiunto automaticamente 'numero': {numero_episodio} a {ep_data['episodio']}")
+                    else:
+                        # Se non combacia con SxEPy, lascia invariato (numero=0) o gestisci diversamente
+                        ep_data["numero"] = 0
+                        changed = True
+                        print(f"DEBUG: Non è stato possibile parsare l'episodio: {ep_data['episodio']}. Imposto numero=0")
+
+    if changed:
+        salva_database()
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -80,7 +114,7 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if serie:
         buttons = []
-        stagioni = sorted(map(int, serie["stagioni"].keys()))
+        stagioni = sorted(serie["stagioni"].keys())
         for stagione in stagioni:
             callback_data = f"{serie_id}|{stagione}"
             print(f"[{get_user_info(update)}] DEBUG: Pulsante creato - Stagione {stagione}, callback_data={callback_data}")
@@ -116,7 +150,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"DEBUG: Serie trovata: {serie}")
 
     if serie and stagione in serie["stagioni"]:
-        # Ordina gli episodi in base al campo "numero"
+        # Ordina gli episodi in base al campo "numero" (se non c'è, viene 0, ma grazie al pass in carica_database non dovrebbe mancare)
         episodi = sorted(serie["stagioni"][stagione], key=lambda ep: ep.get("numero", 0))
         print(f"[{get_user_info(update)}] DEBUG: Episodi ordinati: {episodi}")
 
@@ -258,6 +292,7 @@ async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Configurazione del bot
 def main():
+    # Carichiamo il database con la funzione che normalizza le stagioni e aggiunge "numero" mancante
     carica_database()
 
     if not TOKEN or not CHANNEL_ID:
@@ -272,7 +307,9 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(CommandHandler("rimuovi", rimuovi_episodio))
-    application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
+    application.add_handler(
+        MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id)
+    )
 
     application.run_polling()
 
