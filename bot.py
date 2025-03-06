@@ -103,75 +103,6 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         print(f"[{get_user_info(update)}] DEBUG: Nessuna serie trovata con ID {serie_id}.")
         await query.message.edit_text("Errore: serie non trovata nel database.")
-import asyncio
-
-async def rescan_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Riscansiona il canale per aggiornare il database degli episodi disponibili."""
-    await update.message.reply_text("🔄 Avvio scansione del canale per aggiornare il database...")
-
-    global database
-    database = {}
-
-    try:
-        # Ottieni il canale
-        chat = await context.bot.get_chat(CHANNEL_ID)
-
-        # Ottieni la cronologia dei messaggi (fino a 1000 messaggi)
-        messages = []
-        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=1000):
-            if message.video and message.caption:
-                messages.append(message)
-
-            # Aggiungi un piccolo ritardo per evitare il timeout
-            await asyncio.sleep(0.1)
-
-        if not messages:
-            await update.message.reply_text("❌ Nessun video trovato nel canale.")
-            return
-
-        for message in messages:
-            file_id = message.video.file_id
-            caption = message.caption
-
-            # Estrai i dati dalla descrizione
-            match = re.search(
-                r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
-            )
-            if match:
-                serie_nome, stagione, episodio = match.groups()
-                stagione = int(stagione)
-                episodio = int(episodio)
-                titolo = f"S{stagione}EP{episodio}"
-                episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
-                serie_id = serie_nome.lower().replace(" ", "_")
-
-                # Aggiunge la serie se non esiste
-                if serie_id not in database:
-                    database[serie_id] = {
-                        "nome": serie_nome,
-                        "stagioni": {}
-                    }
-
-                # Aggiunge la stagione se non esiste
-                if stagione not in database[serie_id]["stagioni"]:
-                    database[serie_id]["stagioni"][stagione] = []
-
-                # Aggiunge l'episodio alla stagione
-                database[serie_id]["stagioni"][stagione].append({
-                    "episodio": titolo,
-                    "file_id": file_id,
-                    "episodio_id": episodio_id
-                })
-
-        # Salva il database aggiornato
-        salva_database()
-        await update.message.reply_text("✅ Database aggiornato con gli episodi attualmente presenti nel canale!")
-        print(f"[{get_user_info(update)}] DEBUG: Database aggiornato con la nuova scansione.")
-
-    except Exception as e:
-        print(f"[{get_user_info(update)}] DEBUG: Errore nella scansione del canale: {e}")
-        await update.message.reply_text("❌ Errore durante la scansione del canale. Controlla i log.")
-
 
 # Funzione per mostrare gli episodi
 async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -319,7 +250,6 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
-    application.add_handler(CommandHandler("rescan", rescan_database))
 
 
     application.run_polling()
