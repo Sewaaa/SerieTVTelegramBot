@@ -103,8 +103,7 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         print(f"[{get_user_info(update)}] DEBUG: Nessuna serie trovata con ID {serie_id}.")
         await query.message.edit_text("Errore: serie non trovata nel database.")
-
-#rescane
+#rescan
 async def rescan_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Riscansiona il canale per aggiornare il database degli episodi disponibili."""
     await update.message.reply_text("🔄 Avvio scansione del canale per aggiornare il database...")
@@ -114,40 +113,51 @@ async def rescan_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     database = {}
 
     try:
-        async for message in context.bot.get_chat_history(chat_id=int(CHANNEL_ID), limit=1000):
-            if message.video and message.caption:
-                file_id = message.video.file_id
-                caption = message.caption
+        updates = await context.bot.get_updates()
+        messages = []
 
-                # Estrai i dati dalla descrizione
-                match = re.search(
-                    r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
-                )
-                if match:
-                    serie_nome, stagione, episodio = match.groups()
-                    stagione = int(stagione)  # Converti in numero intero
-                    episodio = int(episodio)
-                    titolo = f"S{stagione}EP{episodio}"
-                    episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
-                    serie_id = serie_nome.lower().replace(" ", "_")
+        # Cerca i messaggi video nel canale
+        for update in updates:
+            if update.channel_post and update.channel_post.video:
+                messages.append(update.channel_post)
 
-                    # Aggiunge la serie se non esiste
-                    if serie_id not in database:
-                        database[serie_id] = {
-                            "nome": serie_nome,
-                            "stagioni": {}
-                        }
+        if not messages:
+            await update.message.reply_text("❌ Nessun video trovato nel canale.")
+            return
 
-                    # Aggiunge la stagione se non esiste
-                    if stagione not in database[serie_id]["stagioni"]:
-                        database[serie_id]["stagioni"][stagione] = []
+        for message in messages:
+            file_id = message.video.file_id
+            caption = message.caption
 
-                    # Aggiunge l'episodio alla stagione
-                    database[serie_id]["stagioni"][stagione].append({
-                        "episodio": titolo,
-                        "file_id": file_id,
-                        "episodio_id": episodio_id
-                    })
+            # Estrai i dati dalla descrizione
+            match = re.search(
+                r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
+            )
+            if match:
+                serie_nome, stagione, episodio = match.groups()
+                stagione = int(stagione)  # Converti in numero intero
+                episodio = int(episodio)
+                titolo = f"S{stagione}EP{episodio}"
+                episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
+                serie_id = serie_nome.lower().replace(" ", "_")
+
+                # Aggiunge la serie se non esiste
+                if serie_id not in database:
+                    database[serie_id] = {
+                        "nome": serie_nome,
+                        "stagioni": {}
+                    }
+
+                # Aggiunge la stagione se non esiste
+                if stagione not in database[serie_id]["stagioni"]:
+                    database[serie_id]["stagioni"][stagione] = []
+
+                # Aggiunge l'episodio alla stagione
+                database[serie_id]["stagioni"][stagione].append({
+                    "episodio": titolo,
+                    "file_id": file_id,
+                    "episodio_id": episodio_id
+                })
 
         # Salva il database aggiornato
         salva_database()
