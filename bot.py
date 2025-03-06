@@ -291,6 +291,8 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
+    application.add_handler(CommandHandler("remove", remove_episode, pass_args=True))
+
 
     application.run_polling()
 
