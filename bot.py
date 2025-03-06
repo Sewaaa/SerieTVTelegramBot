@@ -51,6 +51,7 @@ def carica_database():
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"[{get_user_info(update)}] DEBUG: Comando /start ricevuto")
     # Controlla se l'update proviene da un messaggio o da un callback
     if update.message:
         message = update.message
