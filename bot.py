@@ -104,6 +104,47 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"[{get_user_info(update)}] DEBUG: Nessuna serie trovata con ID {serie_id}.")
         await query.message.edit_text("Errore: serie non trovata nel database.")
 
+#rimuovi
+async def remove_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Rimuove un episodio manualmente dal database usando il comando /remove NomeSerie Stagione Episodio"""
+    if not context.args or len(context.args) < 3:
+        await update.message.reply_text("❌ Formato errato! Usa il comando:\n`/remove NomeSerie Stagione Episodio`", parse_mode="Markdown")
+        return
+
+    serie_id = context.args[0].lower().replace(" ", "_")  # Converti in ID formato corretto
+    try:
+        stagione = int(context.args[1])
+        episodio = int(context.args[2])
+    except ValueError:
+        await update.message.reply_text("❌ Stagione ed episodio devono essere numeri!\nEsempio: `/remove Breaking Bad 1 1`", parse_mode="Markdown")
+        return
+
+    # Controlla se la serie esiste
+    if serie_id in database and stagione in database[serie_id]["stagioni"]:
+        episodi = database[serie_id]["stagioni"][stagione]
+
+        # Cerca l'episodio da rimuovere
+        for ep in episodi:
+            if ep["episodio"] == f"S{stagione}EP{episodio}":
+                episodi.remove(ep)
+                
+                # Se la stagione non ha più episodi, rimuovila
+                if not episodi:
+                    del database[serie_id]["stagioni"][stagione]
+
+                # Se la serie non ha più stagioni, rimuovila
+                if not database[serie_id]["stagioni"]:
+                    del database[serie_id]
+
+                salva_database()  # Salva le modifiche nel database
+                await update.message.reply_text(f"✅ Episodio *S{stagione}EP{episodio}* rimosso con successo!", parse_mode="Markdown")
+                print(f"[{get_user_info(update)}] DEBUG: Episodio rimosso manualmente - {serie_id} S{stagione}EP{episodio}")
+                return
+
+    await update.message.reply_text("❌ Episodio non trovato nel database.", parse_mode="Markdown")
+
+
+
 # Funzione per mostrare gli episodi
 async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
