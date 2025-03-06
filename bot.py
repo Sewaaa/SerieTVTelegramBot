@@ -104,44 +104,59 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"[{get_user_info(update)}] DEBUG: Nessuna serie trovata con ID {serie_id}.")
         await query.message.edit_text("Errore: serie non trovata nel database.")
 
-#rimuovi
-async def remove_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Rimuove un episodio manualmente dal database usando il comando /remove NomeSerie Stagione Episodio"""
-    if not context.args or len(context.args) < 3:
-        await update.message.reply_text("❌ Formato errato! Usa il comando:\n`/remove NomeSerie Stagione Episodio`", parse_mode="Markdown")
-        return
+#rescane
+async def rescan_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Riscansiona il canale per aggiornare il database degli episodi disponibili."""
+    await update.message.reply_text("🔄 Avvio scansione del canale per aggiornare il database...")
 
-    serie_id = context.args[0].lower().replace(" ", "_")  # Converti in ID formato corretto
+    # Pulisce il database attuale
+    global database
+    database = {}
+
     try:
-        stagione = int(context.args[1])
-        episodio = int(context.args[2])
-    except ValueError:
-        await update.message.reply_text("❌ Stagione ed episodio devono essere numeri!\nEsempio: `/remove Breaking Bad 1 1`", parse_mode="Markdown")
-        return
+        async for message in context.bot.get_chat_history(chat_id=int(CHANNEL_ID), limit=1000):
+            if message.video and message.caption:
+                file_id = message.video.file_id
+                caption = message.caption
 
-    # Controlla se la serie esiste
-    if serie_id in database and stagione in database[serie_id]["stagioni"]:
-        episodi = database[serie_id]["stagioni"][stagione]
+                # Estrai i dati dalla descrizione
+                match = re.search(
+                    r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
+                )
+                if match:
+                    serie_nome, stagione, episodio = match.groups()
+                    stagione = int(stagione)  # Converti in numero intero
+                    episodio = int(episodio)
+                    titolo = f"S{stagione}EP{episodio}"
+                    episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
+                    serie_id = serie_nome.lower().replace(" ", "_")
 
-        # Cerca l'episodio da rimuovere
-        for ep in episodi:
-            if ep["episodio"] == f"S{stagione}EP{episodio}":
-                episodi.remove(ep)
-                
-                # Se la stagione non ha più episodi, rimuovila
-                if not episodi:
-                    del database[serie_id]["stagioni"][stagione]
+                    # Aggiunge la serie se non esiste
+                    if serie_id not in database:
+                        database[serie_id] = {
+                            "nome": serie_nome,
+                            "stagioni": {}
+                        }
 
-                # Se la serie non ha più stagioni, rimuovila
-                if not database[serie_id]["stagioni"]:
-                    del database[serie_id]
+                    # Aggiunge la stagione se non esiste
+                    if stagione not in database[serie_id]["stagioni"]:
+                        database[serie_id]["stagioni"][stagione] = []
 
-                salva_database()  # Salva le modifiche nel database
-                await update.message.reply_text(f"✅ Episodio *S{stagione}EP{episodio}* rimosso con successo!", parse_mode="Markdown")
-                print(f"[{get_user_info(update)}] DEBUG: Episodio rimosso manualmente - {serie_id} S{stagione}EP{episodio}")
-                return
+                    # Aggiunge l'episodio alla stagione
+                    database[serie_id]["stagioni"][stagione].append({
+                        "episodio": titolo,
+                        "file_id": file_id,
+                        "episodio_id": episodio_id
+                    })
 
-    await update.message.reply_text("❌ Episodio non trovato nel database.", parse_mode="Markdown")
+        # Salva il database aggiornato
+        salva_database()
+        await update.message.reply_text("✅ Database aggiornato con gli episodi attualmente presenti nel canale!")
+        print(f"[{get_user_info(update)}] DEBUG: Database aggiornato con la nuova scansione.")
+
+    except Exception as e:
+        print(f"[{get_user_info(update)}] DEBUG: Errore nella scansione del canale: {e}")
+        await update.message.reply_text("❌ Errore durante la scansione del canale. Controlla i log.")
 
 
 # Funzione per mostrare gli episodi
@@ -290,7 +305,7 @@ def main():
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(CommandHandler("debug", debug_database))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
-    application.add_handler(CommandHandler("remove", remove_episode))
+    application.add_handler(CommandHandler("rescan", rescan_database))
 
 
     application.run_polling()
