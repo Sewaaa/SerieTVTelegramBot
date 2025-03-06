@@ -157,16 +157,26 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         episodio_id = query.data.split("|")[1]
         print(f"[{get_user_info(update)}] DEBUG: invia_episodio chiamata. Episodio ID: {episodio_id}")
 
-        for serie in database.values():
-            for stagioni in serie["stagioni"].values():
-                for episodio in stagioni:
+        for serie_id, serie in database.items():
+            for stagione, episodi in serie["stagioni"].items():
+                for episodio in episodi:
                     if episodio["episodio_id"] == episodio_id:
                         file_id = episodio["file_id"]
-                        await query.message.reply_video(video=file_id)
-                        print(f"DEBUG: Video inviato per episodio ID: {episodio_id}")
-                        return
+                        try:
+                            await query.message.reply_video(video=file_id)
+                            print(f"[{get_user_info(update)}] DEBUG: Video inviato per episodio ID: {episodio_id}")
+                            return
+                        except Exception as e:
+                            print(f"[{get_user_info(update)}] DEBUG: Il file non esiste più. Errore: {e}")
 
-        print(f"DEBUG: Episodio ID non trovato: {episodio_id}")
+                            # Rimuove l'episodio dal database
+                            episodi.remove(episodio)
+                            salva_database()
+                            
+                            await query.message.reply_text("⚠️ Questo episodio non è più disponibile e sarà rimosso dalla lista.")
+                            return
+
+        print(f"[{get_user_info(update)}] DEBUG: Episodio ID non trovato: {episodio_id}")
         await query.message.reply_text("Errore: episodio non trovato.")
     except Exception as e:
         print(f"[{get_user_info(update)}] DEBUG: Errore nell'invio dell'episodio: {e}")
