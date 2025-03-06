@@ -14,13 +14,12 @@ DATABASE_FILE = "/data/database.json"  # Assicurati che il volume persistente su
 # Database per le serie TV
 database = {}
 
-#funzione per prendere username telegram
+# Funzione per prendere username telegram
 def get_user_info(update: Update):
     """Restituisce l'username, l'ID e il nome dell'utente che interagisce con il bot."""
     user = update.effective_user
     username = f"@{user.username}" if user.username else "Sconosciuto"
     return f"{username} | {user.first_name}"
-
 
 # Funzione per salvare il database su un file JSON
 def salva_database():
@@ -47,7 +46,6 @@ def carica_database():
         print("DEBUG: Nessun file di database trovato, avvio con database vuoto.")
     except Exception as e:
         print(f"DEBUG: Errore durante il caricamento del database: {e}")
-
 
 # Funzione per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -138,7 +136,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Episodi di {serie['nome']} - Stagione {stagione}:",
                 reply_markup=reply_markup
             )
-            print("[{get_user_info(update)}] DEBUG: Messaggio aggiornato con la lista degli episodi.")
+            print(f"[{get_user_info(update)}] DEBUG: Messaggio aggiornato con la lista degli episodi.")
         except Exception as e:
             print(f"[{get_user_info(update)}] DEBUG: Errore nell'aggiornamento del messaggio degli episodi: {e}")
     else:
@@ -167,12 +165,10 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             print(f"[{get_user_info(update)}] DEBUG: Video inviato per episodio ID: {episodio_id}")
                             return
                         except Exception as e:
-                            print(f"[{get_user_info(update)}] DEBUG: Il file non esiste più. Errore: {e}")
-
+                            print(f"[{get_user_info(update)}] DEBUG: Il file non esiste più per episodio ID: {episodio_id}. Errore: {e}")
                             # Rimuove l'episodio dal database
                             episodi.remove(episodio)
                             salva_database()
-                            
                             await query.message.reply_text("⚠️ Questo episodio non è più disponibile e sarà rimosso dalla lista.")
                             return
 
@@ -199,11 +195,11 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
         )
         if not match:
-            print("[{get_user_info(update)}] DEBUG: Formato della descrizione non valido.")
+            print(f"[{get_user_info(update)}] DEBUG: Formato della descrizione non valido. Caption: {caption}")
             return
 
         serie_nome, stagione, episodio = match.groups()
-        stagione = int(stagione)  # Converte la stagione in un intero
+        stagione = int(stagione)
         episodio = int(episodio)
         titolo = f"S{stagione}EP{episodio}"
         episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
@@ -224,10 +220,40 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "episodio_id": episodio_id
         })
 
-        print(f"Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
+        print(f"DEBUG: Aggiunto: {serie_nome} - Stagione {stagione}, Episodio {episodio}: {titolo}")
 
         # Salva il database su file
         salva_database()
+
+# Nuova funzione per rimuovere manualmente un episodio dal database
+async def rimuovi_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"[{get_user_info(update)}] DEBUG: Comando /rimuovi ricevuto")
+    if not context.args:
+        await update.message.reply_text("Utilizzo: /rimuovi <episodio_id>")
+        print(f"[{get_user_info(update)}] DEBUG: Nessun episodio_id fornito con /rimuovi")
+        return
+
+    episodio_id_da_rimuovere = context.args[0]
+    trovato = False
+
+    for serie_id, serie in database.items():
+        for stagione, episodi in serie["stagioni"].items():
+            for episodio in episodi:
+                if episodio["episodio_id"] == episodio_id_da_rimuovere:
+                    episodi.remove(episodio)
+                    salva_database()
+                    await update.message.reply_text(f"Episodio {episodio_id_da_rimuovere} rimosso dal database.")
+                    print(f"[{get_user_info(update)}] DEBUG: Episodio {episodio_id_da_rimuovere} rimosso dalla serie {serie_id}, stagione {stagione}")
+                    trovato = True
+                    break
+            if trovato:
+                break
+        if trovato:
+            break
+
+    if not trovato:
+        await update.message.reply_text("Errore: episodio non trovato.")
+        print(f"[{get_user_info(update)}] DEBUG: Episodio {episodio_id_da_rimuovere} non trovato nel database.")
 
 # Funzione per stampare il database nei log
 async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -249,8 +275,8 @@ def main():
     application.add_handler(CallbackQueryHandler(invia_episodio, pattern=r"^play\|"))
     application.add_handler(CallbackQueryHandler(torna_alla_lista, pattern=r"^indietro$"))
     application.add_handler(CommandHandler("debug", debug_database))
+    application.add_handler(CommandHandler("rimuovi", rimuovi_episodio))
     application.add_handler(MessageHandler(filters.VIDEO & filters.Chat(chat_id=int(CHANNEL_ID)), leggi_file_id))
-
 
     application.run_polling()
 
