@@ -14,6 +14,14 @@ DATABASE_FILE = "/data/database.json"  # Assicurati che il volume persistente su
 # Database per le serie TV
 database = {}
 
+#funzione per prendere username telegram
+def get_user_info(update: Update):
+    """Restituisce l'username, l'ID e il nome dell'utente che interagisce con il bot."""
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else "Sconosciuto"
+    return f"[User: {username} | ID: {user.id} | Nome: {user.first_name}]"
+
+
 # Funzione per salvare il database su un file JSON
 def salva_database():
     try:
@@ -79,7 +87,7 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
         stagioni = sorted(map(int, serie["stagioni"].keys()))
         for stagione in stagioni:
             callback_data = f"{serie_id}|{stagione}"
-            print(f"DEBUG: Pulsante creato - Stagione {stagione}, callback_data={callback_data}")
+            print(f"[{get_user_info(update)}] DEBUG: Pulsante creato - Stagione {stagione}, callback_data={callback_data}")
             buttons.append([InlineKeyboardButton(f"Stagione {stagione}", callback_data=callback_data)])
 
         buttons.append([InlineKeyboardButton("Torna alla lista", callback_data="indietro")])
@@ -88,11 +96,11 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             await query.message.edit_text(f"Scegli una stagione di {serie['nome']}:", reply_markup=reply_markup)
-            print(f"DEBUG: Messaggio aggiornato per mostrare le stagioni di {serie['nome']}.")
+            print(f"[{get_user_info(update)}] DEBUG: Messaggio aggiornato per mostrare le stagioni di {serie['nome']}.")
         except Exception as e:
-            print(f"DEBUG: Errore nell'aggiornamento del messaggio delle stagioni: {e}")
+            print(f"[{get_user_info(update)}] DEBUG: Errore nell'aggiornamento del messaggio delle stagioni: {e}")
     else:
-        print(f"DEBUG: Nessuna serie trovata con ID {serie_id}.")
+        print(f"[{get_user_info(update)}] DEBUG: Nessuna serie trovata con ID {serie_id}.")
         await query.message.edit_text("Errore: serie non trovata nel database.")
 
 # Funzione per mostrare gli episodi
@@ -103,9 +111,9 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         serie_id, stagione = query.data.split("|")
         stagione = int(stagione)
-        print(f"DEBUG: mostra_episodi chiamata. Serie ID: {serie_id}, Stagione: {stagione}")
+        print(f"[{get_user_info(update)}] DEBUG: mostra_episodi chiamata. Serie ID: {serie_id}, Stagione: {stagione}")
     except ValueError as e:
-        print(f"DEBUG: Errore nel parsing del callback data: {query.data}, errore: {e}")
+        print(f"[{get_user_info(update)}] DEBUG: Errore nel parsing del callback data: {query.data}, errore: {e}")
         await query.message.edit_text("Errore: callback data non valido.")
         return
 
@@ -114,7 +122,7 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if serie and stagione in serie["stagioni"]:
         episodi = serie["stagioni"][stagione]
-        print(f"DEBUG: Episodi trovati: {episodi}")
+        print(f"[{get_user_info(update)}] DEBUG: Episodi trovati: {episodi}")
 
         buttons = [
             [InlineKeyboardButton(ep["episodio"], callback_data=f"play|{ep['episodio_id']}")]
@@ -129,11 +137,11 @@ async def mostra_episodi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Episodi di {serie['nome']} - Stagione {stagione}:",
                 reply_markup=reply_markup
             )
-            print("DEBUG: Messaggio aggiornato con la lista degli episodi.")
+            print("[{get_user_info(update)}] DEBUG: Messaggio aggiornato con la lista degli episodi.")
         except Exception as e:
-            print(f"DEBUG: Errore nell'aggiornamento del messaggio degli episodi: {e}")
+            print(f"[{get_user_info(update)}] DEBUG: Errore nell'aggiornamento del messaggio degli episodi: {e}")
     else:
-        print(f"DEBUG: Nessun episodio trovato per serie_id={serie_id}, stagione={stagione}")
+        print(f"[{get_user_info(update)}] DEBUG: Nessun episodio trovato per serie_id={serie_id}, stagione={stagione}")
         await query.message.edit_text(
             f"Nessun episodio trovato per {serie['nome']} - Stagione {stagione}."
             if serie else "Errore: serie non trovata nel database."
@@ -146,7 +154,7 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         episodio_id = query.data.split("|")[1]
-        print(f"DEBUG: invia_episodio chiamata. Episodio ID: {episodio_id}")
+        print(f"[{get_user_info(update)}] DEBUG: invia_episodio chiamata. Episodio ID: {episodio_id}")
 
         for serie in database.values():
             for stagioni in serie["stagioni"].values():
@@ -160,7 +168,7 @@ async def invia_episodio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"DEBUG: Episodio ID non trovato: {episodio_id}")
         await query.message.reply_text("Errore: episodio non trovato.")
     except Exception as e:
-        print(f"DEBUG: Errore nell'invio dell'episodio: {e}")
+        print(f"[{get_user_info(update)}] DEBUG: Errore nell'invio dell'episodio: {e}")
         await query.message.reply_text("Errore durante l'invio dell'episodio.")
 
 # Funzione per tornare alla lista delle serie
@@ -180,7 +188,7 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             r"Serie: (.+)\nStagione: (\d+)\nEpisodio: (\d+)", caption, re.IGNORECASE
         )
         if not match:
-            print("DEBUG: Formato della descrizione non valido.")
+            print("[{get_user_info(update)}] DEBUG: Formato della descrizione non valido.")
             return
 
         serie_nome, stagione, episodio = match.groups()
@@ -212,7 +220,7 @@ async def leggi_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Funzione per stampare il database nei log
 async def debug_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"DEBUG: Struttura del database:\n{database}")
+    print(f"[{get_user_info(update)}] DEBUG: Struttura del database:\n{database}")
     await update.message.reply_text("La struttura del database è stata stampata nei log.")
 
 # Configurazione del bot
