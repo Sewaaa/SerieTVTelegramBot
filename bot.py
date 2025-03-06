@@ -103,23 +103,27 @@ async def mostra_stagioni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         print(f"[{get_user_info(update)}] DEBUG: Nessuna serie trovata con ID {serie_id}.")
         await query.message.edit_text("Errore: serie non trovata nel database.")
-#rescan
+import asyncio
+
 async def rescan_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Riscansiona il canale per aggiornare il database degli episodi disponibili."""
     await update.message.reply_text("🔄 Avvio scansione del canale per aggiornare il database...")
 
-    # Pulisce il database attuale
     global database
     database = {}
 
     try:
-        updates = await context.bot.get_updates()
-        messages = []
+        # Ottieni il canale
+        chat = await context.bot.get_chat(CHANNEL_ID)
 
-        # Cerca i messaggi video nel canale
-        for update in updates:
-            if update.channel_post and update.channel_post.video:
-                messages.append(update.channel_post)
+        # Ottieni la cronologia dei messaggi (fino a 1000 messaggi)
+        messages = []
+        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=1000):
+            if message.video and message.caption:
+                messages.append(message)
+
+            # Aggiungi un piccolo ritardo per evitare il timeout
+            await asyncio.sleep(0.1)
 
         if not messages:
             await update.message.reply_text("❌ Nessun video trovato nel canale.")
@@ -135,7 +139,7 @@ async def rescan_database(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             if match:
                 serie_nome, stagione, episodio = match.groups()
-                stagione = int(stagione)  # Converti in numero intero
+                stagione = int(stagione)
                 episodio = int(episodio)
                 titolo = f"S{stagione}EP{episodio}"
                 episodio_id = f"{serie_nome.lower().replace(' ', '_')}_{stagione}_{episodio}"
