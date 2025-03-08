@@ -3,11 +3,19 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
+
+
+
 app = 'serietvtelegrambot-thrumming-snowflake-9389'
 primary_region = 'fra'
 
+
+  
 [build]
   builder = 'paketobuildpacks/builder:base'
+  
+[experimental]
+  auto_stop_machines = false
 
 [env]
   PORT = '8080'
